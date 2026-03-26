@@ -1,18 +1,10 @@
 {
   "seed_paper": "https://arxiv.org/abs/1706.03762",
-  "max_hops": 1,
+  "max_hops": 2,
   "total_fetched": 1,
-  "papers_stored": 1,
-  "duplicates_caught": 0,
+  "papers_stored": 0,
+  "duplicates_caught": 39,
   "low_confidence_flagged": 0,
-  "elapsed_seconds": 58.7,
-  "papers": [
-    {
-      "paper_id": "204e3073870fae3d05bcbc2f6a8e263d9b72e776",
-      "title": "Attention is All you Need",
-      "year": 2017,
-      "doi": null,
-      "confidence": 0.8
-    }
-  ]
+  "elapsed_seconds": 69.6,
+  "papers": []
 }

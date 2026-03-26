@@ -1,10 +1,263 @@
 {
   "seed_paper": "https://arxiv.org/abs/1706.03762",
   "max_hops": 2,
-  "total_fetched": 1,
-  "papers_stored": 0,
-  "duplicates_caught": 39,
+  "total_fetched": 37,
+  "papers_stored": 36,
+  "duplicates_caught": 0,
   "low_confidence_flagged": 0,
-  "elapsed_seconds": 69.6,
-  "papers": []
+  "elapsed_seconds": 544.6,
+  "papers": [
+    {
+      "paper_id": "4550a4c714920ef57d19878e31c9ebae37b049b2",
+      "title": "Massive Exploration of Neural Machine Translation Architectures",
+      "year": 2017,
+      "doi": "10.18653/v1/D17-1151",
+      "confidence": 0.95
+    },
+    {
+      "paper_id": "23ffaa0fe06eae05817f527a47ac3291077f9e58",
+      "title": "Rethinking the Inception Architecture for Computer Vision",
+      "year": 2015,
+      "doi": "10.1109/CVPR.2016.308",
+      "confidence": 0.95
+    },
+    {
+      "paper_id": "1518039b5001f1836565215eb047526b3ac7f462",
+      "title": "Neural Machine Translation of Rare Words with Subword Units",
+      "year": 2015,
+      "doi": "10.18653/v1/P16-1162",
+      "confidence": 0.95
+    },
+    {
+      "paper_id": "63e39cdf1ad884da6bc69096bb3413b5b1100559",
+      "title": "Using the Output Embedding to Improve Language Models",
+      "year": 2016,
+      "doi": "10.18653/V1/E17-2025",
+      "confidence": 0.95
+    },
+    {
+      "paper_id": "5e4eb58d5b47ac1c73f4cf189497170e75ae6237",
+      "title": "Neural GPUs Learn Algorithms",
+      "year": 2015,
+      "doi": null,
+      "confidence": 0.8
+    },
+    {
+      "paper_id": "a6cb366736791bcccc5c8639de5a8f9636bf87e8",
+      "title": "Adam: A Method for Stochastic Optimization",
+      "year": 2014,
+      "doi": null,
+      "confidence": 0.8
+    },
+    {
+      "paper_id": "ac3ee98020251797c2b401e1389461df88e52e62",
+      "title": "Empirical Evaluation of Gated Recurrent Neural Networks on Sequence Modeling",
+      "year": 2014,
+      "doi": null,
+      "confidence": 0.95
+    },
+    {
+      "paper_id": "7345843e87c81e24e42264859b214d26042f8d51",
+      "title": "Recurrent Neural Network Grammars",
+      "year": 2016,
+      "doi": "10.18653/v1/N16-1024",
+      "confidence": 0.95
+    },
+    {
+      "paper_id": "735d547fc75e0772d2a78c46a1cc5fad7da1474c",
+      "title": "Can Active Memory Replace Attention?",
+      "year": 2016,
+      "doi": null,
+      "confidence": 0.8
+    },
+    {
+      "paper_id": "2f2d8f8072e5cc9b296fad551f65f183bdbff7aa",
+      "title": "Exploring the Limits of Language Modeling",
+      "year": 2016,
+      "doi": null,
+      "confidence": 0.8
+    },
+    {
+      "paper_id": "34f25a8704614163c4095b3ee2fc969b60de4698",
+      "title": "Dropout: a simple way to prevent neural networks from overfitting",
+      "year": 2014,
+      "doi": "10.5555/2627435.2670313",
+      "confidence": 0.95
+    },
+    {
+      "paper_id": "47570e7f63e296f224a0e7f9a0d08b0de3cbaf40",
+      "title": "Grammar as a Foreign Language",
+      "year": 2014,
+      "doi": null,
+      "confidence": 0.8
+    },
+    {
+      "paper_id": "13fe71da009484f240c46f14d9330e932f8de210",
+      "title": "Long Short-Term Memory-Networks for Machine Reading",
+      "year": 2016,
+      "doi": "10.18653/v1/D16-1053",
+      "confidence": 0.95
+    },
+    {
+      "paper_id": "fa72afa9b2cbc8f0d7b05d52548906610ffbb9c5",
+      "title": "Neural Machine Translation by Jointly Learning to Align and Translate",
+      "year": 2014,
+      "doi": null,
+      "confidence": 0.8
+    },
+    {
+      "paper_id": "c6850869aa5e78a107c378d2e8bfa39633158c0c",
+      "title": "Google's Neural Machine Translation System: Bridging the Gap between Human and Machine Translation",
+      "year": 2016,
+      "doi": null,
+      "confidence": 0.8
+    },
+    {
+      "paper_id": "2e9d221c206e9503ceb452302d68d10e293f2a10",
+      "title": "Long Short-Term Memory",
+      "year": 1997,
+      "doi": "10.1162/neco.1997.9.8.1735",
+      "confidence": 1.0
+    },
+    {
+      "paper_id": "d76c07211479e233f7c6a6f32d5346c983c5598f",
+      "title": "Multi-task Sequence to Sequence Learning",
+      "year": 2015,
+      "doi": null,
+      "confidence": 0.8
+    },
+    {
+      "paper_id": "032274e57f7d8b456bd255fe76b909b2c1d7458e",
+      "title": "A Deep Reinforced Model for Abstractive Summarization",
+      "year": 2017,
+      "doi": null,
+      "confidence": 0.8
+    },
+    {
+      "paper_id": "5b6ec746d309b165f9f9def873a2375b6fb40f3d",
+      "title": "Xception: Deep Learning with Depthwise Separable Convolutions",
+      "year": 2016,
+      "doi": "10.1109/CVPR.2017.195",
+      "confidence": 0.85
+    },
+    {
+      "paper_id": "0b544dfe355a5070b60986319a3f51fb45d1348e",
+      "title": "Learning Phrase Representations using RNN Encoder\u2013Decoder for Statistical Machine Translation",
+      "year": 2014,
+      "doi": "10.3115/v1/D14-1179",
+      "confidence": 0.85
+    },
+    {
+      "paper_id": "2e5f2b57f4c476dd69dc22ccdf547e48f40a994c",
+      "title": "Gradient Flow in Recurrent Nets: the Difficulty of Learning Long-Term Dependencies",
+      "year": 2001,
+      "doi": null,
+      "confidence": 0.8
+    },
+    {
+      "paper_id": "13d9323a8716131911bfda048a40e2cde1a76a46",
+      "title": "Structured Attention Networks",
+      "year": 2017,
+      "doi": null,
+      "confidence": 0.8
+    },
+    {
+      "paper_id": "93499a7c7f699b6630a86fad964536f9423bb6d0",
+      "title": "Effective Approaches to Attention-based Neural Machine Translation",
+      "year": 2015,
+      "doi": "10.18653/v1/D15-1166",
+      "confidence": 0.95
+    },
+    {
+      "paper_id": "5bfd8d40bc071fffaf93685a46974b122ee4239d",
+      "title": "Self-Training PCFG Grammars with Latent Annotations Across Languages",
+      "year": 2009,
+      "doi": "10.3115/1699571.1699621",
+      "confidence": 0.85
+    },
+    {
+      "paper_id": "98445f4172659ec5e891e031d8202c102135c644",
+      "title": "Neural Machine Translation in Linear Time",
+      "year": 2016,
+      "doi": null,
+      "confidence": 0.8
+    },
+    {
+      "paper_id": "6471fd1cbc081fb3b7b5b14d6ab9eaaba02b5c17",
+      "title": "Generating Sequences With Recurrent Neural Networks",
+      "year": 2013,
+      "doi": null,
+      "confidence": 0.8
+    },
+    {
+      "paper_id": "97fb4e3d45bb098e27e0071448b6152217bd35a5",
+      "title": "Layer Normalization",
+      "year": 2016,
+      "doi": null,
+      "confidence": 0.8
+    },
+    {
+      "paper_id": "174bbdb96252454cbb40a9c4e53335996235a008",
+      "title": "Fast and Accurate Shift-Reduce Constituent Parsing",
+      "year": 2013,
+      "doi": null,
+      "confidence": 0.8
+    },
+    {
+      "paper_id": "0b44fcbeea9415d400c5f5789d6b892b6f98daff",
+      "title": "Building a Large Annotated Corpus of English: The Penn Treebank",
+      "year": 1993,
+      "doi": null,
+      "confidence": 0.8
+    },
+    {
+      "paper_id": "79baf48bd560060549998d7b61751286de062e2a",
+      "title": "Factorization tricks for LSTM networks",
+      "year": 2017,
+      "doi": null,
+      "confidence": 0.8
+    },
+    {
+      "paper_id": "b60abe57bc195616063be10638c6437358c81d1e",
+      "title": "Deep Recurrent Models with Fast-Forward Connections for Neural Machine Translation",
+      "year": 2016,
+      "doi": "10.1162/tacl_a_00105",
+      "confidence": 0.95
+    },
+    {
+      "paper_id": "510e26733aaff585d65701b9f1be7ca9d5afc586",
+      "title": "Outrageously Large Neural Networks: The Sparsely-Gated Mixture-of-Experts Layer",
+      "year": 2017,
+      "doi": null,
+      "confidence": 0.8
+    },
+    {
+      "paper_id": "4f10b9f47c5bb6b54dd4f5ca8d9fa2c0bbd7ec5e",
+      "title": "End-To-End Memory Networks",
+      "year": 2015,
+      "doi": null,
+      "confidence": 0.8
+    },
+    {
+      "paper_id": "f52de7242e574b70410ca6fb70b79c811919fc00",
+      "title": "Learning Accurate, Compact, and Interpretable Tree Annotation",
+      "year": 2006,
+      "doi": "10.3115/1220175.1220230",
+      "confidence": 0.95
+    },
+    {
+      "paper_id": "43428880d75b3a14257c3ee9bda054e61eb869c0",
+      "title": "Convolutional Sequence to Sequence Learning",
+      "year": 2017,
+      "doi": null,
+      "confidence": 0.8
+    },
+    {
+      "paper_id": "2c03df8b48bf3fa39054345bafabfeff15bfd11d",
+      "title": "Deep Residual Learning for Image Recognition",
+      "year": 2015,
+      "doi": "10.1109/cvpr.2016.90",
+      "confidence": 0.85
+    }
+  ]
 }

@@ -1,12 +1,12 @@
 """
 Fetch node: retrieves paper data from Semantic Scholar API.
-Checks Pinecone before fetching to skip already-processed papers,
-preventing unnecessary API calls and cyclic traversal.
+Checks Pinecone before fetching to skip already-processed papers.
+Uses exponential backoff and reduced wait times for rate limiting.
 """
 import os
 import re
 import time
-from typing import Dict, Any
+from typing import Dict, Any, List
 import httpx
 from loguru import logger
 
@@ -20,9 +20,7 @@ RATE_LIMIT = SS_CONFIG["rate_limit_delay"]
 
 
 def extract_paper_id(url_or_id: str) -> str:
-    """
-    Extract Semantic Scholar paper ID from various URL formats.
-    """
+    """Extract Semantic Scholar paper ID from various URL formats."""
     match = re.search(r'semanticscholar\.org/paper/[^/]*?/([a-f0-9]{40})', url_or_id)
     if match:
         return match.group(1)
@@ -63,8 +61,34 @@ def check_pinecone_exists(paper_id: str) -> bool:
         return False
 
 
-def fetch_paper(paper_id: str) -> Dict[str, Any]:
-    """Fetch a single paper from Semantic Scholar API."""
+def check_pinecone_batch(paper_ids: List[str]) -> set:
+    """Batch check which papers already exist in Pinecone."""
+    existing_ids = set()
+    try:
+        from pinecone import Pinecone
+        pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
+        index_name = os.getenv("PINECONE_INDEX_NAME", "citation-index")
+
+        existing_indexes = [idx.name for idx in pc.list_indexes()]
+        if index_name not in existing_indexes:
+            return existing_ids
+
+        index = pc.Index(index_name)
+
+        # Batch fetch in chunks of 100
+        for i in range(0, len(paper_ids), 100):
+            batch = paper_ids[i:i+100]
+            result = index.fetch(ids=batch)
+            existing_ids.update(result.get("vectors", {}).keys())
+
+    except Exception as e:
+        logger.warning(f"Pinecone batch check failed: {e}")
+
+    return existing_ids
+
+
+def fetch_paper(paper_id: str, retry_count: int = 0, max_retries: int = 3) -> Dict[str, Any]:
+    """Fetch a single paper with exponential backoff."""
     url = f"{BASE_URL}/paper/{paper_id}"
     params = {"fields": FIELDS}
 
@@ -79,13 +103,18 @@ def fetch_paper(paper_id: str) -> Dict[str, Any]:
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 404:
             logger.warning(f"Paper not found: {paper_id}")
+            return {}
         elif e.response.status_code == 429:
-            logger.warning(f"Rate limited, waiting 5s...")
-            time.sleep(5)
-            return fetch_paper(paper_id)
+            if retry_count >= max_retries:
+                logger.error(f"Max retries reached for {paper_id}")
+                return {}
+            wait = min(2 ** retry_count + 0.5, 10)
+            logger.debug(f"Rate limited, waiting {wait:.1f}s (retry {retry_count + 1}/{max_retries})")
+            time.sleep(wait)
+            return fetch_paper(paper_id, retry_count + 1, max_retries)
         else:
             logger.error(f"HTTP error fetching {paper_id}: {e.response.status_code}")
-        return {}
+            return {}
 
     except Exception as e:
         logger.error(f"Error fetching {paper_id}: {e}")
@@ -95,7 +124,7 @@ def fetch_paper(paper_id: str) -> Dict[str, Any]:
 def fetch_node(state: dict) -> dict:
     """
     LangGraph node: Fetch papers from Semantic Scholar.
-    Queries Pinecone before each fetch to skip already-processed papers.
+    Queries Pinecone in batch before fetching to skip already-processed papers.
     """
     papers_to_fetch = state.get("papers_to_fetch", [])
     already_processed = set(state.get("all_processed_ids", []))
@@ -108,19 +137,18 @@ def fetch_node(state: dict) -> dict:
         paper_id = extract_paper_id(seed_url)
         papers_to_fetch = [paper_id]
 
-    # Filter out already processed papers
+    # Filter out already processed papers (in-memory check)
     to_fetch = [pid for pid in papers_to_fetch if pid not in already_processed]
 
-    # Pre-fetch Pinecone check: skip papers already in the index
-    skipped_pinecone = 0
-    final_fetch_list = []
-    for pid in to_fetch:
-        if check_pinecone_exists(pid):
-            logger.info(f"  Skipped (already in Pinecone): {pid[:50]}")
-            skipped_pinecone += 1
-            already_processed.add(pid)
-        else:
-            final_fetch_list.append(pid)
+    # Batch Pinecone pre-check: skip papers already in the index
+    if to_fetch:
+        pinecone_existing = check_pinecone_batch(to_fetch)
+        skipped_pinecone = len(pinecone_existing)
+        already_processed.update(pinecone_existing)
+        final_fetch_list = [pid for pid in to_fetch if pid not in pinecone_existing]
+    else:
+        skipped_pinecone = 0
+        final_fetch_list = []
 
     logger.info(
         f"Fetch node: {len(final_fetch_list)} to fetch | "

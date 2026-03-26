@@ -1,0 +1,26 @@
+pipeline:
+  max_citation_hops: 2
+  max_papers_per_hop: 50
+  confidence_threshold: 0.7
+  batch_size: 10
+
+openai:
+  model: "gpt-3.5-turbo"
+  temperature: 0.1
+  max_tokens: 2000
+
+pinecone:
+  index_name: "citation-index"
+  dimension: 1536
+  metric: "cosine"
+  cloud: "aws"
+  region: "us-east-1"
+
+semantic_scholar:
+  base_url: "https://api.semanticscholar.org/graph/v1"
+  fields: "title,authors,year,abstract,externalIds,references,citationCount,url"
+  rate_limit_delay: 1.0
+
+api:
+  host: "0.0.0.0"
+  port: 8000

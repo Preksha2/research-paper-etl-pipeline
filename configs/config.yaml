@@ -4,14 +4,18 @@ pipeline:
   confidence_threshold: 0.7
   batch_size: 10
 
-openai:
-  model: "gpt-3.5-turbo"
+llm:
+  model: "Qwen/Qwen2.5-0.5B-Instruct"
   temperature: 0.1
-  max_tokens: 2000
+  max_tokens: 300
+
+embedding:
+  model: "all-MiniLM-L6-v2"
+  dimension: 384
 
 pinecone:
   index_name: "citation-index"
-  dimension: 1536
+  dimension: 384
   metric: "cosine"
   cloud: "aws"
   region: "us-east-1"

@@ -1,100 +1,123 @@
 """
-Extract node: uses OpenAI LLM to enrich and validate paper metadata.
+Extract node: uses a local HuggingFace LLM to enrich and validate paper metadata.
 Handles missing DOIs, incomplete author lists, and abstract summarization.
 Flags low-confidence records for human review.
 """
-import os
 import json
-from typing import List
+import re
+from typing import Optional
 from loguru import logger
-from openai import OpenAI
 
 from src.models.paper import Paper
 from src.utils.config import load_config
 
 config = load_config()
-LLM_CONFIG = config["openai"]
 CONFIDENCE_THRESHOLD = config["pipeline"]["confidence_threshold"]
 
-
-def get_openai_client() -> OpenAI:
-    """Initialize OpenAI client."""
-    return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Lazy-loaded LLM pipeline
+_llm_pipe = None
 
 
-def enrich_paper_with_llm(client: OpenAI, paper: Paper) -> Paper:
+def get_llm_pipeline():
+    """Initialize local LLM pipeline (lazy loaded, singleton)."""
+    global _llm_pipe
+    if _llm_pipe is None:
+        import torch
+        from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+
+        model_name = "Qwen/Qwen2.5-0.5B-Instruct"
+        logger.info(f"Loading local LLM: {model_name}")
+
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        model = AutoModelForCausalLM.from_pretrained(model_name, dtype=torch.float32)
+
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+
+        _llm_pipe = pipeline(
+            "text-generation",
+            model=model,
+            tokenizer=tokenizer,
+            max_new_tokens=300,
+            temperature=0.1,
+            do_sample=True,
+            pad_token_id=tokenizer.eos_token_id,
+        )
+        logger.info(f"Local LLM loaded: {model_name}")
+    return _llm_pipe
+
+
+def enrich_paper_with_llm(paper: Paper) -> Paper:
     """
-    Use LLM to validate and enrich a single paper's metadata.
-    
-    Checks for:
-        - Missing or malformed DOIs
-        - Incomplete author lists
-        - Missing year or abstract
-        - Confidence scoring
+    Use local LLM to validate and enrich a single paper's metadata.
     """
-    prompt = f"""You are a research paper metadata validator. Given the following paper metadata, 
-check for completeness and correctness. Return a JSON object with these fields:
+    pipe = get_llm_pipeline()
 
-- "doi": the DOI if you can identify it (or null)
-- "year": publication year (or null)
-- "confidence": float 0-1 indicating how complete/reliable the metadata is
-- "notes": any issues found (string)
-
-Paper:
-- Title: {paper.title}
-- Authors: {', '.join(a.name for a in paper.authors)}
-- Year: {paper.year}
-- DOI: {paper.doi}
-- Abstract: {(paper.abstract or 'N/A')[:300]}
-
-Return ONLY valid JSON, no explanation."""
+    prompt_messages = [
+        {"role": "system", "content": "You are a research paper metadata validator. Return only valid JSON with fields: doi (string or null), year (int or null), confidence (float 0-1), notes (string)."},
+        {"role": "user", "content": f"Validate this paper metadata and return JSON:\nTitle: {paper.title}\nAuthors: {', '.join(a.name for a in paper.authors[:5])}\nYear: {paper.year}\nDOI: {paper.doi}\nAbstract: {(paper.abstract or 'N/A')[:200]}"},
+    ]
 
     try:
-        response = client.chat.completions.create(
-            model=LLM_CONFIG["model"],
-            messages=[
-                {"role": "system", "content": "You are a metadata validation assistant. Return only valid JSON."},
-                {"role": "user", "content": prompt},
-            ],
-            temperature=LLM_CONFIG["temperature"],
-            max_tokens=300,
-        )
+        tokenizer = pipe.tokenizer
+        prompt = tokenizer.apply_chat_template(prompt_messages, tokenize=False, add_generation_prompt=True)
 
-        content = response.choices[0].message.content.strip()
-        # Clean potential markdown fences
-        content = content.replace("`json", "").replace("`", "").strip()
-        result = json.loads(content)
+        output = pipe(prompt)
+        generated = output[0]["generated_text"]
 
-        # Update paper with LLM enrichment
-        if result.get("doi") and not paper.doi:
-            paper.doi = result["doi"]
-        if result.get("year") and not paper.year:
-            paper.year = result["year"]
+        if generated.startswith(prompt):
+            response_text = generated[len(prompt):].strip()
+        else:
+            response_text = generated.strip()
 
-        paper.confidence = result.get("confidence", paper.confidence)
-        paper.extraction_notes = result.get("notes", "")
+        json_match = re.search(r'\{[^{}]+\}', response_text)
+        if json_match:
+            result = json.loads(json_match.group())
 
-        return paper
+            if result.get("doi") and not paper.doi:
+                paper.doi = result["doi"]
+            if result.get("year") and not paper.year:
+                paper.year = result["year"]
 
-    except json.JSONDecodeError as e:
-        logger.warning(f"LLM returned invalid JSON for '{paper.title[:40]}': {e}")
-        paper.confidence = 0.5
-        paper.extraction_notes = "LLM extraction failed - invalid JSON response"
-        return paper
+            conf = result.get("confidence")
+            if conf is not None:
+                paper.confidence = float(conf)
+            paper.extraction_notes = result.get("notes", "")
+        else:
+            paper = _heuristic_enrich(paper)
 
     except Exception as e:
-        logger.error(f"LLM extraction error for '{paper.title[:40]}': {e}")
-        paper.confidence = 0.5
-        paper.extraction_notes = f"LLM extraction error: {str(e)}"
-        return paper
+        logger.warning(f"LLM extraction failed for '{paper.title[:40]}': {e}")
+        paper = _heuristic_enrich(paper)
+
+    # Ensure confidence is never None
+    if paper.confidence is None:
+        paper = _heuristic_enrich(paper)
+
+    return paper
+
+
+def _heuristic_enrich(paper: Paper) -> Paper:
+    """Fallback heuristic enrichment when LLM fails."""
+    score = 0.5
+
+    if paper.doi:
+        score += 0.2
+    if paper.year:
+        score += 0.1
+    if paper.abstract and len(paper.abstract) > 100:
+        score += 0.1
+    if len(paper.authors) > 0:
+        score += 0.1
+
+    paper.confidence = min(score, 1.0)
+    paper.extraction_notes = "Enriched via heuristic fallback"
+    return paper
 
 
 def extract_node(state: dict) -> dict:
     """
-    LangGraph node: Enrich parsed papers using OpenAI LLM.
-    
-    Reads from state['parsed_papers'], enriches each via LLM,
-    flags low-confidence records for human review.
+    LangGraph node: Enrich parsed papers using local LLM.
     """
     parsed = state.get("parsed_papers", [])
 
@@ -103,13 +126,12 @@ def extract_node(state: dict) -> dict:
         state["extracted_papers"] = []
         return state
 
-    client = get_openai_client()
     extracted = []
     needs_review = []
 
     for i, paper in enumerate(parsed):
         logger.info(f"  Extracting [{i+1}/{len(parsed)}]: {paper.title[:60]}")
-        enriched = enrich_paper_with_llm(client, paper)
+        enriched = enrich_paper_with_llm(paper)
         extracted.append(enriched)
 
         if enriched.confidence < CONFIDENCE_THRESHOLD:

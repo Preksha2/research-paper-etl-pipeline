@@ -18,7 +18,7 @@ def load_config(path: str = "configs/config.yaml") -> dict:
 def load_env():
     """Load environment variables from .env file."""
     load_dotenv()
-    required = ["OPENAI_API_KEY", "PINECONE_API_KEY"]
+    required = ["PINECONE_API_KEY"]
     missing = [k for k in required if not os.getenv(k)]
     if missing:
         raise EnvironmentError(f"Missing required environment variables: {missing}")

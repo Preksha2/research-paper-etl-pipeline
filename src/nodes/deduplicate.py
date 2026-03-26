@@ -1,12 +1,12 @@
 """
 Deduplicate node: checks papers against Pinecone index to prevent
 storing duplicates and catching cyclic references in citation chains.
+Uses local sentence-transformers for embeddings (no OpenAI needed).
 """
 import os
-from typing import List, Tuple
+from typing import List
 from loguru import logger
 from pinecone import Pinecone
-from openai import OpenAI
 
 from src.models.paper import Paper
 from src.utils.config import load_config
@@ -14,19 +14,30 @@ from src.utils.config import load_config
 config = load_config()
 PINECONE_CONFIG = config["pinecone"]
 
+# Lazy-loaded embedder
+_embedder = None
+
+
+def get_embedder():
+    """Initialize sentence-transformer embedder (lazy loaded, singleton)."""
+    global _embedder
+    if _embedder is None:
+        from sentence_transformers import SentenceTransformer
+        _embedder = SentenceTransformer("all-MiniLM-L6-v2")
+        logger.info("Embedding model loaded: all-MiniLM-L6-v2")
+    return _embedder
+
 
 def get_pinecone_client() -> Pinecone:
     """Initialize Pinecone client."""
     return Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 
 
-def get_embedding(client: OpenAI, text: str) -> List[float]:
-    """Generate embedding for a text using OpenAI."""
-    response = client.embeddings.create(
-        model="text-embedding-ada-002",
-        input=text[:8000],
-    )
-    return response.data[0].embedding
+def get_embedding(text: str) -> List[float]:
+    """Generate embedding using local sentence-transformers."""
+    embedder = get_embedder()
+    embedding = embedder.encode(text, normalize_embeddings=True)
+    return embedding.tolist()
 
 
 def ensure_index_exists(pc: Pinecone, index_name: str) -> None:
@@ -36,7 +47,7 @@ def ensure_index_exists(pc: Pinecone, index_name: str) -> None:
         from pinecone import ServerlessSpec
         pc.create_index(
             name=index_name,
-            dimension=PINECONE_CONFIG["dimension"],
+            dimension=384,
             metric=PINECONE_CONFIG["metric"],
             spec=ServerlessSpec(
                 cloud=PINECONE_CONFIG["cloud"],
@@ -44,7 +55,6 @@ def ensure_index_exists(pc: Pinecone, index_name: str) -> None:
             ),
         )
         logger.info(f"Created Pinecone index: {index_name}")
-        # Wait for index to be ready
         import time
         time.sleep(10)
     else:
@@ -63,10 +73,6 @@ def check_duplicate(index, paper_id: str) -> bool:
 def deduplicate_node(state: dict) -> dict:
     """
     LangGraph node: Deduplicate papers against Pinecone.
-
-    Queries Pinecone for each paper ID before allowing it through.
-    Catches duplicate entries and prevents cyclic loops in
-    deeply nested citation networks.
     """
     reviewed = state.get("reviewed_papers", [])
 

@@ -1,13 +1,12 @@
 """
 Store node: persists deduplicated papers into Pinecone with vector embeddings.
-Each paper is stored with its embedding and full metadata for later retrieval.
+Uses local sentence-transformers for embedding generation (no OpenAI needed).
 """
 import os
 import time
-from typing import List, Dict, Any
+from typing import Dict, Any
 from loguru import logger
 from pinecone import Pinecone
-from openai import OpenAI
 
 from src.models.paper import Paper
 from src.nodes.deduplicate import get_pinecone_client, ensure_index_exists, get_embedding
@@ -49,9 +48,6 @@ def paper_to_metadata(paper: Paper) -> Dict[str, Any]:
 def store_node(state: dict) -> dict:
     """
     LangGraph node: Store papers in Pinecone with embeddings.
-
-    Generates embeddings via OpenAI, then upserts papers into Pinecone
-    in batches. Each paper is stored with full metadata for retrieval.
     """
     papers = state.get("deduplicated_papers", [])
 
@@ -65,8 +61,6 @@ def store_node(state: dict) -> dict:
     ensure_index_exists(pc, index_name)
     index = pc.Index(index_name)
 
-    openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
     stored = []
     vectors_batch = []
 
@@ -74,7 +68,7 @@ def store_node(state: dict) -> dict:
         logger.info(f"  Storing [{i+1}/{len(papers)}]: {paper.title[:50]}")
 
         text = paper_to_text(paper)
-        embedding = get_embedding(openai_client, text)
+        embedding = get_embedding(text)
         metadata = paper_to_metadata(paper)
 
         vectors_batch.append({
@@ -85,14 +79,12 @@ def store_node(state: dict) -> dict:
 
         stored.append(paper)
 
-        # Upsert in batches
         if len(vectors_batch) >= BATCH_SIZE:
             index.upsert(vectors=vectors_batch)
             logger.info(f"  Upserted batch of {len(vectors_batch)} vectors")
             vectors_batch = []
             time.sleep(0.5)
 
-    # Upsert remaining
     if vectors_batch:
         index.upsert(vectors=vectors_batch)
         logger.info(f"  Upserted final batch of {len(vectors_batch)} vectors")

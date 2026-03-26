@@ -8,7 +8,7 @@ Built for researchers and analysts who need to quickly map the citation landscap
 
 Given a single seed paper URL, the pipeline:
 
-1. **Fetches** the paper and its references from Semantic Scholar
+1. **Fetches** the paper and its references from Semantic Scholar (with Pinecone pre-check to skip known papers)
 2. **Parses** raw API responses into structured records
 3. **Extracts** and validates metadata via a local LLM (Qwen 2.5)
 4. **Resolves** citations recursively up to N hops deep
@@ -34,15 +34,32 @@ seed_url
 
 Each node's output feeds directly into the next. State is persisted across all nodes via LangGraph's checkpointing, enabling pause/resume and crash recovery.
 
+## Demo Results
+
+Using "Attention Is All You Need" (Vaswani et al., 2017) as the seed paper:
+
+```
+RESULTS SUMMARY
+════════════════════════════════════════════════════════════
+Total papers fetched:      37
+Papers stored in Pinecone: 36
+Duplicates caught:         39 (on re-run via Pinecone pre-check)
+Low confidence flagged:    0
+Errors:                    0
+Total time:                ~9 min (first run) / ~13s (cached re-run)
+```
+
+On re-run, the pipeline queries Pinecone **before** fetching — all 39 previously stored papers are skipped instantly, completing in 13 seconds with zero redundant API calls.
+
 ## Tech Stack
 
-- **Orchestration**: LangGraph (stateful directed graph with 7 nodes)
-- **LLM**: Qwen 2.5 (local, free) for metadata extraction — OpenAI supported as optional backend
+- **Orchestration**: LangGraph (stateful directed graph with 7 nodes + conditional edges)
+- **LLM**: Qwen 2.5 (local, free) for metadata extraction and validation
 - **Embeddings**: Sentence-Transformers (all-MiniLM-L6-v2) for vector generation
-- **Vector Store**: Pinecone for deduplication and persistent storage
+- **Vector Store**: Pinecone for deduplication, cycle detection, and persistent storage
 - **Data Source**: Semantic Scholar API (free, no key required)
 - **API**: FastAPI endpoint for triggering pipeline runs
-- **State Management**: LangGraph persistence with checkpoint/resume
+- **State Management**: LangGraph persistence with checkpoint/resume support
 
 ## Quick Start
 
@@ -60,43 +77,41 @@ The demo uses "Attention Is All You Need" as the seed paper and traverses 1 hop 
 
 To customize:
 ```bash
+# Full 2-hop traversal
+python scripts/demo.py --hops 2
+
 # Different seed paper
-python scripts/demo.py --url "https://arxiv.org/abs/2005.14165" --hops 2
+python scripts/demo.py --url "https://arxiv.org/abs/2005.14165" --hops 1
 
 # Use ArXiv ID directly
 python scripts/demo.py --url "ArXiv:1810.04805" --hops 1
 ```
 
-## Demo Output
+## Key Design Decisions
 
-```
-RESULTS SUMMARY
-════════════════════════════════════════════════════════════
-Total papers fetched:      1
-Papers stored in Pinecone: 1
-Duplicates caught:         0
-Low confidence flagged:    0
-Errors:                    0
-Total time:                58.7s
+**Pinecone pre-check before fetching**: The fetch node queries Pinecone in batch before making any Semantic Scholar API calls. On a re-run of 39 papers, this reduced execution time from ~15 minutes to 13 seconds — zero redundant API calls, zero wasted compute.
 
-Papers stored:
-────────────────────────────────────────────────────────────
-  1. Attention is All you Need
-     Year: 2017 | DOI: N/A | Confidence: 0.80
-     Authors: Ashish Vaswani, Noam Shazeer, Niki Parmar
-```
+**Stateful directed graph over linear scripts**: Each node is independently testable. The graph handles branching (continue traversal vs. proceed to review) via conditional edges, eliminating hand-coded glue scripts between steps.
+
+**Exponential backoff with retry cap**: Rate-limited requests use progressive delays (1.5s → 2.5s → 4.5s) with a max of 3 retries per paper, preventing infinite retry loops while respecting API limits.
+
+**Human-in-the-loop interrupt**: Low-confidence records (missing DOIs, ambiguous metadata) are flagged for review. LangGraph's checkpointing enables the pipeline to resume from the exact paused node after correction.
+
+**Heuristic fallback for LLM extraction**: When the LLM returns invalid JSON or fails, a heuristic scorer (based on presence of DOI, year, abstract, authors) provides confidence scores — ensuring the pipeline never stalls on a single bad extraction.
+
+**Shared traversal state**: All 7 nodes read/write from a single state dict persisted via LangGraph's memory layer. The pipeline can be killed and restarted mid-run with zero reprocessing of already-completed nodes.
 
 ## Project Structure
 
 ```
 src/
 ├── nodes/                  # LangGraph node implementations
-│   ├── fetch.py            # Paper fetching from Semantic Scholar
+│   ├── fetch.py            # Semantic Scholar fetching + Pinecone pre-check
 │   ├── parse.py            # Raw response parsing into Paper objects
-│   ├── extract.py          # LLM-powered metadata extraction + validation
+│   ├── extract.py          # LLM metadata extraction + heuristic fallback
 │   ├── resolve.py          # Citation chain resolution + hop management
 │   ├── review.py           # Human-in-the-loop review + auto-fix
-│   ├── deduplicate.py      # Pinecone-based deduplication + cycle detection
+│   ├── deduplicate.py      # Pinecone deduplication + cycle detection
 │   └── store.py            # Vector embedding + Pinecone storage
 ├── graph/                  # LangGraph pipeline definition
 │   └── pipeline.py         # 7-node graph with conditional traversal edges
@@ -136,20 +151,8 @@ uvicorn src.api.server:app --reload --port 8000
 # Trigger a pipeline run
 curl -X POST http://localhost:8000/run \
   -H "Content-Type: application/json" \
-  -d '{"seed_paper_url": "https://arxiv.org/abs/1706.03762", "max_hops": 1}'
+  -d '{"seed_paper_url": "https://arxiv.org/abs/1706.03762", "max_hops": 2}'
 ```
-
-## Key Design Decisions
-
-**Stateful directed graph over linear scripts**: Each node is independently testable and the graph handles branching (continue traversal vs. proceed to review) via conditional edges, eliminating hand-coded glue scripts.
-
-**Conditional citation resolution**: The resolve node queries Pinecone before fetching, skipping already-processed papers and preventing cyclic loops in deeply nested citation networks.
-
-**Human-in-the-loop interrupt**: Low-confidence records (missing DOIs, ambiguous metadata) are flagged for review. LangGraph's checkpointing enables the pipeline to resume from the exact paused node after correction.
-
-**Shared traversal state**: All 7 nodes read/write from a single `PipelineState` object persisted via LangGraph's memory layer, validated by the ability to kill and restart the pipeline mid-run with zero reprocessing.
-
-**Local-first LLM**: Uses Qwen 2.5 (0.5B) locally for metadata extraction — no API keys or costs for the LLM component. Pinecone free tier handles vector storage.
 
 ## Configuration
 
